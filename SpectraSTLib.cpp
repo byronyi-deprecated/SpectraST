@@ -619,6 +619,12 @@ void SpectraSTLib::initializeDatabase() {
 
     rc = sqlite3_exec(db, db_stmt.c_str(), NULL, NULL, NULL);
 
+    if(rc != SQLITE_OK) {
+        sqlite3_close(db);
+        cerr << "Cannot open the given library." << endl;
+        return;
+    }
+
     db_stmt = "PRAGMA cache_size = 128000"; // change the default cache size (# of pages) of SQLite. 128000 PAGES = 128 MB
     rc = sqlite3_exec(db, db_stmt.c_str(), NULL, NULL, NULL);
 
@@ -628,12 +634,6 @@ void SpectraSTLib::initializeDatabase() {
         cout << "The SQLite3 cache is " <<  sqlite3_column_int(stmt, 0) << " Pages" << endl;
 
     sqlite3_finalize(stmt);
-
-    if(rc != SQLITE_OK) {
-        sqlite3_close(db);
-        cerr << "Cannot open the given library." << endl;
-        return;
-    }
 
     peptide_stmt = NULL;
     peak_stmt = NULL;
