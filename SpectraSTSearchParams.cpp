@@ -165,7 +165,7 @@ void SpectraSTSearchParams::finalizeOptions() {
       if (!optionValue.empty()) {
 	fixpath(optionValue);
 	getExtension(optionValue, extension);
-	if (extension == ".splib") {
+    if (extension == ".splib" || extension == ".db") {
 	  libraryFile = optionValue;
 	  valid = true;					
 	}

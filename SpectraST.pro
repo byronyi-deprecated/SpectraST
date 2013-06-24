@@ -56,7 +56,8 @@ HEADERS += FileUtils.hpp \
            SpectraSTTxtSearchOutput.hpp \
            SpectraSTXHunterLibImporter.hpp \
            SpectraSTXlsSearchOutput.hpp \
-           XMLWalker.hpp
+           XMLWalker.hpp \
+           sqlite3.h
 SOURCES += FileUtils.cpp \
            Peptide.cpp \
            Predicate.cpp \
@@ -104,4 +105,8 @@ SOURCES += FileUtils.cpp \
            SpectraSTTxtSearchOutput.cpp \
            SpectraSTXHunterLibImporter.cpp \
            SpectraSTXlsSearchOutput.cpp \
-           XMLWalker.cpp
+           XMLWalker.cpp \
+           sqlite3.c
+
+OTHER_FILES += \
+    Makefile

@@ -7,9 +7,15 @@
 #include "SpectraSTSearchParams.hpp"
 #include "SpectraSTCreateParams.hpp"
 #include "FileUtils.hpp"
+#include "sqlite3.h"
 #include <string>
 #include <vector>
+#include <list>
+#include <algorithm>
 #include <fstream>
+
+#define CACHE_SIZE 16
+#define BLOCK_SIZE 1
 
 /*
 
@@ -43,91 +49,107 @@ hlam@systemsbiology.org
 */
 
 /* Class: SpectraSTLib
- * 
+ *
  * The class that represents the library in memory. NOTE however that since the library
- * file .splib is huge, it is typically not read into memory in its entirety. Instead 
- * SpectraSTLib only keeps the index and the fstream objects in memory, and only goes 
- * to the .splib file to retrieve the entries when it is asked to, except for a few recently used entries cached 
+ * file .splib is huge, it is typically not read into memory in its entirety. Instead
+ * SpectraSTLib only keeps the index and the fstream objects in memory, and only goes
+ * to the .splib file to retrieve the entries when it is asked to, except for a few recently used entries cached
  * in memory.
- * 
+ *
  */
 
 using namespace std;
 
 
 class SpectraSTLib {
-	
+
 public:
-  SpectraSTLib(vector<string>& impFileNames, SpectraSTCreateParams* createParams);
-  SpectraSTLib(string libFileName, SpectraSTSearchParams* searchParams, bool loadPeptideIndex = false);
-  
-  ~SpectraSTLib();
-  
-  string getLibFileName() { return (m_libFileName); }
-  
-  void insertEntry(SpectraSTLibEntry* entry);
-  
-  void retrieve(vector<SpectraSTLibEntry*>& hits, double lowMz, double highMz);
-  
-  SpectraSTPeptideLibIndex* getPeptideLibIndexPtr() { return (m_pepIndex); }
-  
-  void printStats();
-  
-  void writePreamble(vector<string>& lines);
-  
-  int getCount() { return (m_count); }
-  
+    SpectraSTLib(vector<string>& impFileNames, SpectraSTCreateParams* createParams);
+    SpectraSTLib(string libFileName, SpectraSTSearchParams* searchParams, bool loadPeptideIndex = false);
 
-  
+    ~SpectraSTLib();
+
+    string getLibFileName() { return (m_libFileName); }
+
+    void insertEntry(SpectraSTLibEntry* entry);
+
+    void retrieve(vector<SpectraSTLibEntry*>& hits, double lowMz, double highMz);
+
+    SpectraSTPeptideLibIndex* getPeptideLibIndexPtr() { return (m_pepIndex); }
+
+    void printStats();
+
+    void writePreamble(vector<string>& lines);
+
+    int getCount() { return (m_count); }
+
+
+
 private:
-  
-  
-  // m_mzIndex - points to the precursor m/z index object. This object is instantiated by SpectraSTLib and
-  // IS the property of SpectraSTLib.
-  SpectraSTMzLibIndex* m_mzIndex;
-  
-  // m_pepIndex - points to the peptide index object. This object is instantiated by SpectraSTLib and
-  // IS the property of SpectraSTLib.
-  SpectraSTPeptideLibIndex* m_pepIndex;
-  
-  // m_searchParams & m_createParams - points to the params object. The one corresponding to the
-  // mode (Search/Create) will be instantiated by SpectraSTMain and passed into here (using the
-  // respective constructor); the other will be set to NULL. These pointers are also used to keep track of the
-  // which mode this SpectraSTLib object is created for. 
-  SpectraSTSearchParams* m_searchParams;
-  SpectraSTCreateParams* m_createParams;
-  
-  // m_newLibId - counter used to assign a unique ID to each entry during Create mode
-  unsigned int m_newLibId;
-  
-  // The file names. All these are the full file names that include the path and the extension
-  string m_libFileName;   // the .splib file used for searching, or for holding the result of creating
-  string m_txtFileName;   // if the .splib is binary, a separate text file .sptxt is also printed for human readability
-  vector<string> m_impFileNames; // files to be imported and create library from
-  string m_mzIdxFileName;  // the corresponding .spidx file
-  string m_pepIdxFileName; // the corresponding .pepidx file
-  FileName m_libFileNameStruct;
-  
-  // fstream objects for i/o
-  ifstream m_libFin;
-  ofstream m_libFout;
-  ofstream m_txtFout; 
-  ofstream* m_mrmFout;
-  ofstream* m_mgfFout;
-  ofstream* m_PAIdentFout;
-  
-  // Counter
-  unsigned int m_count;
-  
-  // Flag to indicate we cannot open a .sptxt file to write
-  bool m_noSptxt;
-  
-  // Utility functions for initialization
-  void initializeLibSearchMode(bool loadPeptideIndex);
-  void initializeLibCreateMode();
-  
-  void extractDatabaseFileFromPreamble(bool binary);
 
+
+    // m_mzIndex - points to the precursor m/z index object. This object is instantiated by SpectraSTLib and
+    // IS the property of SpectraSTLib.
+    SpectraSTMzLibIndex* m_mzIndex;
+
+    // m_pepIndex - points to the peptide index object. This object is instantiated by SpectraSTLib and
+    // IS the property of SpectraSTLib.
+    SpectraSTPeptideLibIndex* m_pepIndex;
+
+    // m_searchParams & m_createParams - points to the params object. The one corresponding to the
+    // mode (Search/Create) will be instantiated by SpectraSTMain and passed into here (using the
+    // respective constructor); the other will be set to NULL. These pointers are also used to keep track of the
+    // which mode this SpectraSTLib object is created for.
+    SpectraSTSearchParams* m_searchParams;
+    SpectraSTCreateParams* m_createParams;
+
+    // m_newLibId - counter used to assign a unique ID to each entry during Create mode
+    unsigned int m_newLibId;
+
+    // The file names. All these are the full file names that include the path and the extension
+    string m_libFileName;   // the .splib file used for searching, or for holding the result of creating
+    string m_txtFileName;   // if the .splib is binary, a separate text file .sptxt is also printed for human readability
+    vector<string> m_impFileNames; // files to be imported and create library from
+    string m_mzIdxFileName;  // the corresponding .spidx file
+    string m_pepIdxFileName; // the corresponding .pepidx file
+    FileName m_libFileNameStruct;
+
+    // fstream objects for i/o
+    ifstream m_libFin;
+    ofstream m_libFout;
+    ofstream m_txtFout;
+    ofstream* m_mrmFout;
+    ofstream* m_mgfFout;
+    ofstream* m_PAIdentFout;
+
+    // Counter
+    unsigned int m_count;
+
+    // Flag to indicate we cannot open a .sptxt file to write
+    bool m_noSptxt;
+
+    // Utility functions for initialization
+    void initializeLibSearchMode(bool loadPeptideIndex);
+    void initializeLibCreateMode();
+
+    void extractDatabaseFileFromPreamble(bool binary);
+
+    // SQLite database connections methods and pointers
+    void initializeDatabase();
+    void resetCache();
+    void retrieveSQL(vector<SpectraSTLibEntry *> &hits, double lowMz, double highMz);
+    void shutdownDatabase();
+
+    sqlite3* db;
+    sqlite3_stmt* peptide_stmt;
+    sqlite3_stmt* peak_stmt;
+
+    int hit;
+    int miss;
+    typedef pair<int, SpectraSTLibEntry*> Entry;
+    typedef vector<Entry> block;
+    map<int, block> m_cache;
+    list<int> cache_queue;
 };
 
 #endif /*SPECTRALIB_HPP_*/

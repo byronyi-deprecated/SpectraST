@@ -35,6 +35,9 @@ LFSFLAGS= -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 WARNINGFLAGS = -Werror -Wformat -Wstrict-aliasing -Wno-deprecated -Wno-char-subscripts
 IFLAGS=
 
+# multi-thread support and dynamic library support
+SQLITE= -ldl -lpthread
+
 ifeq (${LGPL},1)
 CXX=g++ ${DEBUG} ${IFLAGS} ${WARNINGFLAGS} ${LFSFLAGS} ${OSFLAGS} -DSTANDALONE_LINUX -D__LGPL__
 else
@@ -75,7 +78,7 @@ OBJS= ${ARCH}/SpectraSTLib.o ${ARCH}/SpectraSTLibIndex.o \
 	${ARCH}/SpectraSTSearchTaskStats.o \
 	${ARCH}/SpectraSTFastaFileHandler.o \
 	${ARCH}/SpectraSTDenoiser.o \
-	${ARCH}/FileUtils.o ${ARCH}/Peptide.o ${ARCH}/XMLWalker.o \
+        ${ARCH}/FileUtils.o ${ARCH}/Peptide.o ${ARCH}/XMLWalker.o ${ARCH}/sqlite3.o \
 	${ARCH}/ProgressCount.o ${ARCH}/Predicate.o \
 	${MYCRAMP} ${MYKWSET}
 
@@ -83,7 +86,7 @@ OBJS= ${ARCH}/SpectraSTLib.o ${ARCH}/SpectraSTLibIndex.o \
 #
 # rules
 #
-.SUFFIXES:	.o .cpp 
+.SUFFIXES:	.o .cpp
 
 #
 # note we have our own arch subdirs, needed
@@ -102,7 +105,7 @@ ${ARCH}/%.o : %.cpp
 all : ${EXE}
 
 ${ARCH}/spectrast : ${OBJS}
-	$(CXX) $(DEBUG) -O2 $^ $(LDFLAGS) -o $@ 
+	$(CXX) $(DEBUG) -O2 $^ $(LDFLAGS) $(SQLITE) -o $@
 
 ${ARCH}/plotspectrast.cgi : ${ARCH}/plotspectrast_cgi.o ${ARCH}/SpectraSTLibEntry.o ${ARCH}/SpectraSTQuery.o ${ARCH}/SpectraSTPeakList.o ${ARCH}/SpectraSTDenoiser.o ${ARCH}/SpectraSTLog.o ${ARCH}/FileUtils.o ${ARCH}/Peptide.o ${MYCRAMP}
 	$(CXX) -O2 $^ $(LDFLAGS) -o $@ 
@@ -115,6 +118,9 @@ ${ARCH}/Lib2HTML : ${ARCH}/Lib2HTML.o ${ARCH}/SpectraSTPeptideLibIndex.o ${ARCH}
 
 ${ARCH}/plotspectrast_cgi.o : plotspectrast.cpp 
 	$(CXX) $(LFSFLAGS) $(IFLAGS) ${WARNINGFLAGS} -D RUN_AS_CGI -O2 -o ${ARCH}/plotspectrast_cgi.o -c plotspectrast.cpp 
+
+${ARCH}/sqlite3.o : sqlite3.c sqlite3.h
+	gcc -o ${ARCH}/sqlite3.o -c sqlite3.c
 
 clean:
 	rm -rf ${ARCH}; rm -f $(EXE) core* *~
@@ -179,3 +185,4 @@ ${ARCH}/SpectraST_base64.o : SpectraST_base64.cpp SpectraST_base64.h
 ${ARCH}/SpectraST_ramp.o :  SpectraST_ramp.cpp SpectraST_ramp.h
 ${ARCH}/SpectraST_cramp.o : SpectraST_cramp.cpp SpectraST_cramp.hpp
 ${ARCH}/SpectraST_util.o : SpectraST_util.cpp SpectraST_util.h
+${ARCH}/sqlite3.o : sqlite3.c sqlite3.h
