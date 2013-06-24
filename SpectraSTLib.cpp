@@ -622,7 +622,7 @@ void SpectraSTLib::initializeDatabase() {
     if(rc != SQLITE_OK) {
         sqlite3_close(db);
         cerr << "Cannot open the given library." << endl;
-        return;
+        exit(1);
     }
 
     db_stmt = "PRAGMA cache_size = 128000"; // change the default cache size (# of pages) of SQLite. 128000 PAGES = 128 MB
