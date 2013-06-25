@@ -141,8 +141,7 @@ private:
     void shutdownDatabase();
 
     sqlite3* db;
-    sqlite3_stmt* peptide_stmt;
-    sqlite3_stmt* peak_stmt;
+    sqlite3_stmt* stmt;
 
     int hit;
     int miss;

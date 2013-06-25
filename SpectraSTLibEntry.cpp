@@ -125,6 +125,8 @@ SpectraSTLibEntry::SpectraSTLibEntry(string name, double precursorMz, string com
   if (!m_peakList) {
     m_peakList = new SpectraSTPeakList(m_precursorMz, m_charge, 0, false, m_fragType);
   }
+
+  m_pep = new Peptide(m_name, m_charge);
   
 }
 

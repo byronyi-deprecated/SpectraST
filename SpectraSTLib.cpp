@@ -607,11 +607,6 @@ void SpectraSTLib::initializeDatabase() {
 
     sqlite3_initialize();
 
-
-//  rc = sqlite3_open_v2(m_libFileName.c_str(), &db,
-//                       SQLITE_OPEN_READONLY, NULL);
-
-
     sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READONLY, NULL); // in-memory mode
 
     string db_stmt = "ATTACH DATABASE '";
@@ -625,35 +620,16 @@ void SpectraSTLib::initializeDatabase() {
         exit(1);
     }
 
-    db_stmt = "PRAGMA cache_size = 128000"; // change the default cache size (# of pages) of SQLite. 128000 PAGES = 128 MB
+    db_stmt = "PRAGMA cache_size = 128000"; /* change the default cache size (# of pages) of SQLite. 128000 PAGES = 128 MB */
     rc = sqlite3_exec(db, db_stmt.c_str(), NULL, NULL, NULL);
 
-    sqlite3_stmt *stmt = NULL;
-    sqlite3_prepare_v2(db, "PRAGMA cache_size", -1, &stmt, NULL);
-    if(sqlite3_step(stmt) == SQLITE_ROW)
-        cout << "The SQLite3 cache is " <<  sqlite3_column_int(stmt, 0) << " Pages" << endl;
+    stmt = NULL;
 
-    sqlite3_finalize(stmt);
+    sqlite3_prepare_v2(db, "SELECT * FROM db.Library WHERE Mz BETWEEN (:lowMz) AND (:highMz);",
+                       -1, &stmt, NULL);
 
-    peptide_stmt = NULL;
-    peak_stmt = NULL;
-
-    sqlite3_prepare_v2(db, "SELECT id, name, charge, "
-                       "precursorMZ, status, fragType, "
-//                       "comment, "
-                       "numPeaks, precursorIntMZ "
-                       "FROM db.peptide WHERE "
-                       "precursorIntMZ between (:lowMz) AND (:highMz);",
-//                     "WHERE precursorMZ "
-//                     "BETWEEN (:lowMz) AND (:highMz);",
-                       //"ORDER BY precursorMZ ASC;",
-                       -1, &peptide_stmt, NULL);
-
-    sqlite3_prepare_v2(db, "SELECT mz, intensity, "
-                       "annotations FROM "
-                       "db.peaklist WHERE id = (:id) "
-                       "AND intensity_rank < 50;",
-                       -1, &peak_stmt, NULL);
+//    CREATE TABLE Library (PeptideName text, Mz real, Charge integer,
+//    NumPeak integer, Mz1 real, Intensity1 real, Annotation1 text, ...);
 
     hit = 0;
     miss = 0;
@@ -661,8 +637,8 @@ void SpectraSTLib::initializeDatabase() {
 
 void SpectraSTLib::retrieveSQL(vector<SpectraSTLibEntry *> &hits, double lowMz, double highMz)
 {
-    int idx_low = (int) (lowMz - MIN_MZ) / BLOCK_SIZE; // % (int) (MAX_MZ - MIN_MZ);
-    int idx_high = (int) (highMz - MIN_MZ) / BLOCK_SIZE; // % (int) (MAX_MZ - MIN_MZ);
+    int idx_low = (int) (lowMz - MIN_MZ) / BLOCK_SIZE;
+    int idx_high = (int) (highMz - MIN_MZ) / BLOCK_SIZE;
 
     for(int idx = idx_low; idx <= idx_high; ++idx)
     {
@@ -690,81 +666,46 @@ void SpectraSTLib::retrieveSQL(vector<SpectraSTLibEntry *> &hits, double lowMz, 
                 m_cache.erase(kick_out);
             }
 
-            int id_idx = sqlite3_bind_parameter_index(peak_stmt, ":id");
-            int lowMz_idx = sqlite3_bind_parameter_index(peptide_stmt, ":lowMz");
-            int highMz_idx = sqlite3_bind_parameter_index(peptide_stmt, ":highMz");
+            int lowMz_idx = sqlite3_bind_parameter_index(stmt, ":lowMz");
+            int highMz_idx = sqlite3_bind_parameter_index(stmt, ":highMz");
 
-//          sqlite3_bind_double(peptide_stmt, lowMz_idx, (double) (idx * BLOCK_SIZE + MIN_MZ));
-//          sqlite3_bind_double(peptide_stmt, highMz_idx, (double) ( (idx + 1) * BLOCK_SIZE + MIN_MZ));
+            sqlite3_bind_double(stmt, lowMz_idx, idx * BLOCK_SIZE + MIN_MZ);
+            sqlite3_bind_double(stmt, highMz_idx, (idx + 1) * BLOCK_SIZE + MIN_MZ);
 
-            sqlite3_bind_int(peptide_stmt, lowMz_idx, idx * BLOCK_SIZE + MIN_MZ);
-            sqlite3_bind_int(peptide_stmt, highMz_idx, (idx + 1) * BLOCK_SIZE - 1 + MIN_MZ);
-
-            while(sqlite3_step(peptide_stmt) == SQLITE_ROW)
+            while(sqlite3_step(stmt) == SQLITE_ROW)
             {
-                unsigned int id = sqlite3_column_int(peptide_stmt, 0);
-
-                const char* raw_name = (const char*) (sqlite3_column_text(peptide_stmt, 1));
+                const char* raw_name = (const char*) (sqlite3_column_text(stmt, 0));
                 string name(raw_name);
 
-                int parentCharge = sqlite3_column_int(peptide_stmt, 2);
+                int parentCharge = sqlite3_column_int(stmt, 1);
 
-                double parentMz = sqlite3_column_double(peptide_stmt, 3);
+                double parentMz = sqlite3_column_double(stmt, 2);
 
-                const char* raw_status = (const char*) (sqlite3_column_text(peptide_stmt, 4));
-                string status(raw_status);
-
-                const char* raw_fragType = (const char*) (sqlite3_column_text(peptide_stmt, 5));
-                string fragType(raw_fragType);
-
-//		        const char* raw_comment = (const char*) (sqlite3_column_text(peptide_stmt, 6));
-//		        string comment(raw_comment);
-
-                string comment; // empty comment
-
-                unsigned int numPeaks = sqlite3_column_int(peptide_stmt, 6);
-
-                int intMz = sqlite3_column_int(peptide_stmt, 7);
+                unsigned int numPeaks = sqlite3_column_int(stmt, 3);
 
                 SpectraSTPeakList* newPeaklist = new SpectraSTPeakList(parentMz,
                                                                        parentCharge,
                                                                        numPeaks);
 
-                sqlite3_bind_int(peak_stmt, id_idx, id);
-
-                while(sqlite3_step(peak_stmt) == SQLITE_ROW)
+                for(int i = 0; i != numPeaks; ++i)
                 {
-                    double mz = sqlite3_column_double(peak_stmt, 0);
-                    float intensity = sqlite3_column_double(peak_stmt, 1);
-
-                    const char* raw_annotations = (const char*) (sqlite3_column_text(peak_stmt, 2));
-                    string annotations(raw_annotations);
-
-//                  const char* raw_info = (const char*) (sqlite3_column_text(peak_stmt, 3));
-//                  string info(raw_info);
+                    double mz = sqlite3_column_double(stmt, 3 * i + 4);
+                    double intensity = sqlite3_column_double(stmt, 3 * i + 5);
+                    const char* raw_anno = (const char*) sqlite3_column_text(stmt, 3 * i + 6);
+                    string annotations(raw_anno);
 
                     newPeaklist->insertForSearch(mz, intensity, annotations);
                 }
 
-//		        if (numPeaks != newPeaklist->getNumPeaks())
-//              {
-//                  cerr << "SpectraSTLibEntry: Number of peaks listed does not match specified number. Ignore specified number." << endl;
-//		        }
+                SpectraSTLibEntry* newLibEntry = new SpectraSTLibEntry(name, parentMz, string(),
+                                                                       string(), newPeaklist, string());
 
-
-                SpectraSTLibEntry* newLibEntry = new SpectraSTLibEntry(name, parentMz, comment,
-                                                                       status, newPeaklist, fragType);
-
-                newLibEntry->setLibId(id);
-
-                sqlite3_reset(peak_stmt);
-                sqlite3_clear_bindings(peak_stmt);
-
+                int intMz = parentMz;
                 m_cache[idx].push_back(Entry(intMz, newLibEntry));
             }
 
-            sqlite3_reset(peptide_stmt);
-            sqlite3_clear_bindings(peptide_stmt);
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
         }
 
         for(block::iterator iter = m_cache[idx].begin(); iter != m_cache[idx].end(); ++iter)
@@ -788,8 +729,7 @@ void SpectraSTLib::resetCache()
 
 void SpectraSTLib::shutdownDatabase()
 {
-    sqlite3_finalize(peptide_stmt);
-    sqlite3_finalize(peak_stmt);
+    sqlite3_finalize(stmt);
 
     sqlite3_close(db);
     sqlite3_shutdown();
