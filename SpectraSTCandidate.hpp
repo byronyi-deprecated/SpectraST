@@ -52,7 +52,7 @@ public:
   ~SpectraSTCandidate();
   
   // Simple accessor methods
-  SpectraSTLibEntry* getEntry() { return m_entry; };
+  SpectraSTLibEntry* getEntry() { return m_entry; }
   double getSortKey() { return m_sortKey; }
   
   SpectraSTSimScores& getSimScoresRef() { return m_simScores; }

@@ -20,8 +20,8 @@
 /*
 
 Program       : Spectrast
-Author        : Henry Lam <hlam@systemsbiology.org>                                                       
-Date          : 03.06.06 
+Author        : Henry Lam <hlam@systemsbiology.org>
+Date          : 03.06.06
 
 
 Copyright (C) 2006 Henry Lam
@@ -42,7 +42,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA
 
 Henry Lam
 Insitute for Systems Biology
-1441 North 34th St. 
+1441 North 34th St.
 Seattle, WA  98103  USA
 hlam@systemsbiology.org
 
@@ -141,7 +141,11 @@ private:
     void shutdownDatabase();
 
     sqlite3* db;
-    sqlite3_stmt* stmt;
+    sqlite3_stmt* peptide_stmt;
+    sqlite3_stmt* peaklist_stmt;
+    int bind_lowMz_idx;
+    int bind_highMz_idx;
+    int bind_LibID_idx;
 
     int hit;
     int miss;
